@@ -1,0 +1,6 @@
+{
+  "name": "DFW Monev & Project Hub",
+  "description": "Aplikasi Monitoring & Evaluasi (Monev) program dan Manajemen proyek untuk DFW Indonesia.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

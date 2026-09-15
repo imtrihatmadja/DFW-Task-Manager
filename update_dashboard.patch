@@ -1,0 +1,135 @@
+--- src/pages/Dashboard.tsx
++++ src/pages/Dashboard.tsx
+@@ -10,7 +10,8 @@
+   AlertCircle,
+   Clock,
+   Activity,
+-  Calendar,
+-  LayoutDashboard
++  Target,
++  TrendingUp,
++  History
+ } from 'lucide-react';
+ import { isBefore, startOfDay } from 'date-fns';
+ 
+@@ -58,6 +59,34 @@
+       }
+     });
+ 
++    let totalProgress = 0;
++    let totalIndicators = 0;
++    const allUpdates: any[] = [];
++
++    projects.forEach(p => {
++      if (p.indicators) {
++        p.indicators.forEach(ind => {
++          const current = ind.current || 0;
++          const target = ind.target || 1;
++          const percentage = Math.min(100, Math.max(0, (current / target) * 100));
++          totalProgress += percentage;
++          totalIndicators++;
++
++          if (ind.updates) {
++            ind.updates.forEach(update => {
++              allUpdates.push({
++                projectId: p.id,
++                projectName: p.name,
++                indicatorName: ind.name,
++                unit: ind.unit,
++                update
++              });
++            });
++          }
++        });
++      }
++    });
++
++    const averageProgress = totalIndicators > 0 ? Math.round(totalProgress / totalIndicators) : 0;
++    allUpdates.sort((a, b) => b.update.timestamp - a.update.timestamp);
++    const recentUpdates = allUpdates.slice(0, 5);
++
+     // Recent tasks
+     const recentTasks = [...allTasks]
+       .filter(t => t.status !== 'Done')
+@@ -73,7 +102,9 @@
+       overdueTasks,
+       inProgressTasks,
+       myTasks,
+-      recentTasks
++      recentTasks,
++      averageProgress,
++      recentUpdates
+     };
+   }, [projects, allTasks, profile]);
+ 
+@@ -108,10 +139,10 @@
+           </div>
+         </div>
+         <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 flex items-start">
+-          <div className="p-3 rounded-md bg-green-50 text-green-600 mr-4">
+-            <CheckCircle2 className="h-6 w-6" />
++          <div className="p-3 rounded-md bg-purple-50 text-purple-600 mr-4">
++            <Target className="h-6 w-6" />
+           </div>
+           <div>
+-            <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Completed Tasks</p>
+-            <h3 className="text-3xl font-bold text-gray-900 mt-1">{metrics.completedTasks}</h3>
++            <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Avg Progress</p>
++            <h3 className="text-3xl font-bold text-gray-900 mt-1">{metrics.averageProgress}%</h3>
+           </div>
+         </div>
+@@ -166,8 +197,8 @@
+         </div>
+ 
+         {/* Priority Tasks */}
+-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 lg:col-span-2 flex flex-col">
++        <div className="bg-white rounded-lg shadow-sm border border-gray-200 lg:col-span-1 flex flex-col">
+           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+             <h2 className="text-lg font-bold text-gray-800 flex items-center">
+               <Clock className="h-5 w-5 mr-2 text-gray-400" />
+@@ -213,6 +244,40 @@
+               </ul>
+             )}
+           </div>
+         </div>
++        
++        {/* Recent Updates */}
++        <div className="bg-white rounded-lg shadow-sm border border-gray-200 lg:col-span-1 flex flex-col">
++          <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
++            <h2 className="text-lg font-bold text-gray-800 flex items-center">
++              <History className="h-5 w-5 mr-2 text-gray-400" />
++              Recent Updates
++            </h2>
++          </div>
++          <div className="flex-1 p-0 overflow-auto">
++            {metrics.recentUpdates.length === 0 ? (
++              <div className="p-8 text-center text-gray-500">
++                No recent updates found.
++              </div>
++            ) : (
++              <ul className="divide-y divide-gray-100">
++                {metrics.recentUpdates.map((item, idx) => (
++                  <li key={idx} className="p-4 hover:bg-gray-50 transition-colors">
++                    <Link to={`/projects/${item.projectId}`} className="block">
++                      <div className="flex justify-between items-start mb-1">
++                        <h4 className="text-sm font-bold text-gray-900">{item.projectName}</h4>
++                        <span className="text-xs text-gray-500">{new Date(item.update.timestamp).toLocaleDateString()}</span>
++                      </div>
++                      <p className="text-xs font-medium text-gray-700 mb-1">{item.indicatorName}</p>
++                      <p className="text-xs text-teal-700 font-bold bg-teal-50 inline-block px-2 py-0.5 rounded mb-1">
++                        {item.update.value > 0 ? '+' : ''}{item.update.value} {item.unit}
++                      </p>
++                      {item.update.note && (
++                        <p className="text-xs text-gray-600 line-clamp-2">{item.update.note}</p>
++                      )}
++                    </Link>
++                  </li>
++                ))}
++              </ul>
++            )}
++          </div>
++        </div>
+       </div>
+     </div>
+   );
+ }

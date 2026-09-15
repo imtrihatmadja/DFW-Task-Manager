@@ -1,0 +1,56 @@
+{
+  "collections": [
+    {
+      "name": "users",
+      "fields": [
+        { "name": "uid", "type": "string" },
+        { "name": "email", "type": "string" },
+        { "name": "displayName", "type": "string" },
+        { "name": "photoURL", "type": "string" },
+        { "name": "role", "type": "string" },
+        { "name": "createdAt", "type": "timestamp" }
+      ],
+      "rules": [
+        { "action": "read", "condition": "request.auth != null" },
+        { "action": "write", "condition": "request.auth.uid == resource.id" }
+      ]
+    },
+    {
+      "name": "projects",
+      "fields": [
+        { "name": "name", "type": "string" },
+        { "name": "description", "type": "string" },
+        { "name": "status", "type": "string" },
+        { "name": "members", "type": "array" },
+        { "name": "createdAt", "type": "timestamp" },
+        { "name": "createdBy", "type": "string" }
+      ],
+      "rules": [
+        { "action": "read", "condition": "request.auth != null && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'project_manager' || request.auth.uid in resource.data.members)" },
+        { "action": "create", "condition": "request.auth != null && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'project_manager')" },
+        { "action": "update", "condition": "request.auth != null && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'project_manager')" },
+        { "action": "delete", "condition": "request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'" }
+      ]
+    },
+    {
+      "name": "tasks",
+      "fields": [
+        { "name": "projectId", "type": "string" },
+        { "name": "title", "type": "string" },
+        { "name": "description", "type": "string" },
+        { "name": "assignees", "type": "array" },
+        { "name": "status", "type": "string" },
+        { "name": "priority", "type": "string" },
+        { "name": "dueDate", "type": "timestamp" },
+        { "name": "startDate", "type": "timestamp" },
+        { "name": "tags", "type": "array" },
+        { "name": "createdAt", "type": "timestamp" },
+        { "name": "createdBy", "type": "string" }
+      ],
+      "rules": [
+        { "action": "read", "condition": "request.auth != null && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'project_manager' || request.auth.uid in get(/databases/$(database)/documents/projects/$(resource.data.projectId)).data.members)" },
+        { "action": "write", "condition": "request.auth != null && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'project_manager' || request.auth.uid in get(/databases/$(database)/documents/projects/$(request.resource.data.projectId)).data.members)" }
+      ]
+    }
+  ]
+}

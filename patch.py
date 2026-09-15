@@ -1,0 +1,102 @@
+import re
+
+with open('src/pages/ProjectDetail.tsx', 'r') as f:
+    content = f.read()
+
+# Insert the button
+button_code = """
+            <button
+              onClick={() => setActiveTab('documents')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
+                activeTab === 'documents'
+                  ? 'border-teal-500 text-teal-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center">
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                Dokumen (MoV)
+              </div>
+            </button>
+"""
+content = content.replace('{/* Tabs */}', '{/* Tabs */}') # just a marker
+# Find the end of the tabs container
+target_str = '<div className="flex space-x-4 px-6 overflow-x-auto">'
+content = content.replace(target_str, target_str + button_code)
+
+# Insert the content block
+content_code = """
+            {activeTab === 'documents' && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                  Dokumen & Bukti Capaian (MoV)
+                </h3>
+                
+                {(() => {
+                  const allDocuments: {name: string, url: string, date: number, indicatorName: string}[] = [];
+                  if (project?.indicators) {
+                    project.indicators.forEach(ind => {
+                      if (ind.updates) {
+                        ind.updates.forEach(update => {
+                          if (update.attachments) {
+                            update.attachments.forEach(att => {
+                              allDocuments.push({
+                                name: att.name,
+                                url: att.url,
+                                date: update.timestamp,
+                                indicatorName: ind.name
+                              });
+                            });
+                          }
+                        });
+                      }
+                    });
+                  }
+                  
+                  if (allDocuments.length === 0) {
+                    return (
+                      <div className="text-center py-12 text-gray-500">
+                        <svg className="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        <p>Belum ada dokumen yang diunggah.</p>
+                        <p className="text-sm mt-1">Dokumen bukti yang diunggah saat update capaian indikator akan muncul di sini.</p>
+                      </div>
+                    );
+                  }
+                  
+                  allDocuments.sort((a, b) => b.date - a.date);
+                  
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {allDocuments.map((doc, idx) => (
+                        <a 
+                          key={idx} 
+                          href={doc.url}
+                          target="_blank"
+                          rel="noopener noreferrer" 
+                          className="flex flex-col p-4 border border-gray-200 rounded-lg hover:border-teal-500 hover:shadow-sm transition-all group"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <svg className="w-8 h-8 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                            <svg className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                          </div>
+                          <span className="font-medium text-sm text-gray-900 truncate mb-1" title={doc.name}>{doc.name}</span>
+                          <span className="text-xs text-teal-700 bg-teal-50 inline-block px-2 py-0.5 rounded mb-2 truncate" title={doc.indicatorName}>{doc.indicatorName}</span>
+                          <span className="text-xs text-gray-500 mt-auto">
+                            {new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(doc.date))}
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+"""
+
+target_block = "{activeTab === 'monitoring' && ("
+content = content.replace(target_block, content_code + "\n            " + target_block)
+
+with open('src/pages/ProjectDetail.tsx', 'w') as f:
+    f.write(content)
+

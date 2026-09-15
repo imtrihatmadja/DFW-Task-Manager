@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DFW Monev &amp; Project Hub</title>
+    <meta name="description" content="Aplikasi Monitoring &amp; Evaluasi (Monev) program dan Manajemen proyek untuk DFW Indonesia." />
+    <meta property="og:title" content="DFW Monev &amp; Project Hub" />
+    <meta property="og:description" content="Aplikasi Monitoring &amp; Evaluasi (Monev) program dan Manajemen proyek untuk DFW Indonesia." />
+    <script type="text/javascript">
+      // GitHub Pages SPA route restoration from 404.html
+      (function(l) {
+        if (l.search[1] === '/' ) {
+          var decoded = l.search.slice(1).split('&').map(function(s) { 
+            return s.replace(/~and~/g, '&') 
+          }).join('?');
+          window.history.replaceState(null, null,
+              l.pathname.slice(0, -1) + decoded + l.hash
+          );
+        }
+      }(window.location))
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
