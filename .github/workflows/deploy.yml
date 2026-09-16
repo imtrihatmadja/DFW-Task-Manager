@@ -29,6 +29,10 @@ jobs:
         with:
           node-version: 20
 
+      - name: Ensure recharts is removed
+        run: |
+          npm uninstall recharts || true
+
       - name: Install Dependencies
         run: npm install --legacy-peer-deps --no-audit --no-fund
         env:
