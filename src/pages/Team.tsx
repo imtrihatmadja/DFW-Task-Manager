@@ -14,10 +14,13 @@ import {
   CheckCircle2, 
   Briefcase,
   AlertCircle,
-  UserCheck
+  UserCheck,
+  Save,
+  Check
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useTeamUsersQuery } from '../hooks/useQueries';
+import { queryClient } from '../lib/queryClient';
 
 export default function Team() {
   const { profile } = useAuthStore();
@@ -26,6 +29,8 @@ export default function Team() {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [recentSavedUserId, setRecentSavedUserId] = useState<string | null>(null);
+  const [pendingRoles, setPendingRoles] = useState<Record<string, Role>>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -50,19 +55,48 @@ export default function Team() {
     }
   };
 
-  const handleRoleChange = async (uid: string, newRole: Role) => {
+  const handleSelectRole = (uid: string, newRole: Role) => {
+    setPendingRoles(prev => ({
+      ...prev,
+      [uid]: newRole
+    }));
+  };
+
+  const handleSaveRole = async (uid: string, targetRole: Role, userLabel: string) => {
     if (!isAdmin) return;
     setErrorMsg(null);
     setSuccessMsg(null);
+    
+    // Set UI updating state
+    setUpdatingUserId(uid);
+
     try {
-      setUpdatingUserId(uid);
-      await updateUserRole(uid, newRole);
-      refetch();
-      setSuccessMsg("Peran pengguna berhasil diperbarui.");
+      // 1. Optimistic update di React Query cache secara langsung (0ms delay)
+      queryClient.setQueryData(['teamUsers'], (old: any[] | undefined) => {
+        if (!old) return old;
+        return old.map(u => (u.uid === uid ? { ...u, role: targetRole } : u));
+      });
+
+      // 2. Bersihkan pending role seketika agar tombol simpan segera berubah ke status "Tersimpan"
+      setPendingRoles(prev => {
+        const next = { ...prev };
+        delete next[uid];
+        return next;
+      });
+
+      // 3. Update state di userStore (menyimpan ke local storage dan sinkron Firestore via timeout non-blocking)
+      await updateUserRole(uid, targetRole);
+
+      // 4. Langsung tampilkan status sukses seketika
+      setRecentSavedUserId(uid);
+      setTimeout(() => {
+        setRecentSavedUserId(prev => (prev === uid ? null : prev));
+      }, 3000);
+      setSuccessMsg(`Peran untuk ${userLabel} berhasil disimpan ke ${formatRole(targetRole)}.`);
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (error: any) {
       console.error("Failed to update role", error);
-      setErrorMsg(`Gagal memperbarui peran: ${error?.message || 'Silakan coba lagi'}.`);
+      setErrorMsg(`Gagal menyimpan peran: ${error?.message || 'Silakan coba lagi'}.`);
     } finally {
       setUpdatingUserId(null);
     }
@@ -338,17 +372,71 @@ export default function Team() {
                       {isAdmin && (
                         <td className="px-6 py-4 whitespace-nowrap text-xs">
                           {!isCurrent ? (
-                            <select
-                              disabled={updatingUserId === user.uid}
-                              value={user.role}
-                              onChange={(e) => handleRoleChange(user.uid, e.target.value as Role)}
-                              aria-label={`Ubah peran untuk ${user.displayName || user.email}`}
-                              className="block w-44 pl-2.5 pr-8 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-white text-gray-700 disabled:opacity-50"
-                            >
-                              <option value="field_officer">Field Officer</option>
-                              <option value="project_coordinator">Project Coordinator</option>
-                              <option value="admin">Administrator</option>
-                            </select>
+                            (() => {
+                              const currentSelectedRole = pendingRoles[user.uid] ?? user.role;
+                              const hasChanged = pendingRoles[user.uid] !== undefined && pendingRoles[user.uid] !== user.role;
+                              const isSaving = updatingUserId === user.uid;
+                              const isJustSaved = recentSavedUserId === user.uid;
+
+                              return (
+                                <div className="flex items-center gap-2">
+                                  <select
+                                    disabled={isSaving}
+                                    value={currentSelectedRole}
+                                    onChange={(e) => handleSelectRole(user.uid, e.target.value as Role)}
+                                    aria-label={`Ubah peran untuk ${user.displayName || user.email}`}
+                                    className={`block w-40 pl-2.5 pr-8 py-1.5 text-xs rounded-lg transition-colors bg-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500 disabled:opacity-50 ${
+                                      hasChanged 
+                                        ? 'border-amber-400 bg-amber-50/40 text-gray-900 font-medium' 
+                                        : 'border-gray-300 text-gray-700'
+                                    }`}
+                                  >
+                                    <option value="field_officer">Field Officer</option>
+                                    <option value="project_coordinator">Project Coordinator</option>
+                                    <option value="admin">Administrator</option>
+                                  </select>
+
+                                  {hasChanged ? (
+                                    <div className="flex items-center gap-1 animate-in fade-in duration-150">
+                                      <button
+                                        type="button"
+                                        disabled={isSaving}
+                                        onClick={() => handleSaveRole(user.uid, currentSelectedRole, user.displayName || user.email)}
+                                        className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 focus:outline-hidden focus:ring-2 focus:ring-offset-1 focus:ring-teal-500 transition-all shadow-xs disabled:opacity-50"
+                                        title="Simpan perubahan hak akses"
+                                      >
+                                        {isSaving ? (
+                                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" />
+                                        ) : (
+                                          <Save className="w-3.5 h-3.5 mr-1" />
+                                        )}
+                                        {isSaving ? 'Menyimpan...' : 'Simpan'}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={isSaving}
+                                        onClick={() => {
+                                          setPendingRoles(prev => {
+                                            const next = { ...prev };
+                                            delete next[user.uid];
+                                            return next;
+                                          });
+                                        }}
+                                        className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                        title="Batal ubah"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ) : isJustSaved ? (
+                                    <span className="inline-flex items-center text-xs font-medium text-teal-700 bg-teal-50 px-2 py-1 rounded-md border border-teal-200 animate-in fade-in duration-200">
+                                      <Check className="w-3.5 h-3.5 mr-1 text-teal-600" />
+                                      Tersimpan
+                                    </span>
+                                  ) : null}
+                                </div>
+                              );
+                            })()
                           ) : (
                             <span className="text-xs text-gray-400 italic">Akun aktif Anda</span>
                           )}

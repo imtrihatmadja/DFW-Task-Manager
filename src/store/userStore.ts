@@ -162,7 +162,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     }
   },
   updateUserRole: async (uid: string, newRole: Role) => {
-    // Always update local state immediately
+    // Always update local state immediately (instant response)
     const { users } = get();
     const updatedUsers = users.map(user => 
       user.uid === uid ? { ...user, role: newRole } : user
@@ -170,11 +170,12 @@ export const useUserStore = create<UserState>((set, get) => ({
     saveStoredUsers(updatedUsers);
     set({ users: updatedUsers });
 
+    // Sync to Firestore asynchronously with timeout to prevent hanging spinner
     try {
       const userRef = doc(db, 'users', uid);
-      await updateDoc(userRef, { role: newRole });
+      await withTimeout(setDoc(userRef, { role: newRole }, { merge: true }), 1500);
     } catch (error) {
-      console.warn("Could not sync user role update to Firestore (saved locally):", error);
+      console.warn("Firestore role sync non-blocking warning (saved locally):", error);
     }
   },
   addUser: async (userData) => {
