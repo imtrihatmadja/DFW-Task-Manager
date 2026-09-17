@@ -27,11 +27,17 @@ export default function Sidebar() {
 
   return (
     <div className="flex flex-col w-64 bg-gray-50 border-r border-gray-200 h-screen">
-      <div className="p-4 flex items-center space-x-2 border-b border-gray-200">
-        <div className="w-8 h-8 bg-teal-600 text-white rounded-md flex items-center justify-center font-bold text-lg">
-          D
+      <div className="p-4 flex items-center justify-between border-b border-gray-200">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-teal-600 text-white rounded-md flex items-center justify-center font-bold text-lg">
+            D
+          </div>
+          <span className="font-bold text-gray-900 truncate">DFW Monev Hub</span>
         </div>
-        <span className="font-bold text-gray-900 truncate">DFW Monev Hub</span>
+        <div className="flex items-center space-x-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-medium px-2 py-0.5 rounded-full" title="Semua data tersinkronisasi realtime">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Live</span>
+        </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto py-4">

@@ -218,7 +218,7 @@ export default function TaskModal({ projectId, task, onClose }: TaskModalProps) 
   const [comments, setComments] = useState<Comment[]>(task?.comments || []);
   const [newCommentText, setNewCommentText] = useState('');
 
-  // Keep comments and subtasks in sync in real-time when another user or background sync adds them
+  // Keep comments, subtasks, status, priority, and assignees in sync in real-time when another user updates them
   useEffect(() => {
     if (activeTask) {
       if (activeTask.comments && JSON.stringify(activeTask.comments) !== JSON.stringify(comments)) {
@@ -227,8 +227,17 @@ export default function TaskModal({ projectId, task, onClose }: TaskModalProps) 
       if (activeTask.subtasks && JSON.stringify(activeTask.subtasks) !== JSON.stringify(subtasks)) {
         setSubtasks(activeTask.subtasks);
       }
+      if (activeTask.status && activeTask.status !== status) {
+        setStatus(activeTask.status);
+      }
+      if (activeTask.priority && activeTask.priority !== priority) {
+        setPriority(activeTask.priority);
+      }
+      if (activeTask.assignees && JSON.stringify(activeTask.assignees) !== JSON.stringify(assignees)) {
+        setAssignees(activeTask.assignees);
+      }
     }
-  }, [activeTask?.comments, activeTask?.subtasks]);
+  }, [activeTask?.comments, activeTask?.subtasks, activeTask?.status, activeTask?.priority, activeTask?.assignees]);
 
   // State for mentions & auto-assign notification
   const [mentionNotice, setMentionNotice] = useState<string | null>(null);

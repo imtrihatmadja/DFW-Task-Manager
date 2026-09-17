@@ -2,7 +2,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { Task, TaskStatus } from '../types';
 import { useProjectStore } from '../store/projectStore';
 import { useUserStore } from '../store/userStore';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, MessageSquare, CheckSquare } from 'lucide-react';
 
 interface BoardViewProps {
   tasks: Task[];
@@ -91,6 +91,21 @@ export default function BoardView({ tasks, onTaskClick }: BoardViewProps) {
                           )}
                           
                           <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                            <div className="flex items-center space-x-2 text-xs text-gray-500">
+                              {task.comments && task.comments.length > 0 && (
+                                <span className="inline-flex items-center font-medium text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded text-[11px]" title={`${task.comments.length} komentar tercatat`}>
+                                  <MessageSquare className="h-3 w-3 mr-1" />
+                                  {task.comments.length}
+                                </span>
+                              )}
+                              {task.subtasks && task.subtasks.length > 0 && (
+                                <span className="inline-flex items-center font-medium text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded text-[11px]" title="Progress subtask">
+                                  <CheckSquare className="h-3 w-3 mr-1" />
+                                  {task.subtasks.filter(st => st.isCompleted).length}/{task.subtasks.length}
+                                </span>
+                              )}
+                            </div>
+
                             {task.assignees.length > 0 ? (
                               <div className="flex items-center -space-x-1.5 overflow-hidden">
                                 {task.assignees.slice(0, 3).map((assigneeId, aIdx) => {

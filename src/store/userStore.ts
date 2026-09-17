@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { collection, query, getDocs, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { UserProfile, Role } from '../types';
 import { useAuthStore } from './authStore';
@@ -78,6 +78,7 @@ interface UserState {
   users: UserProfile[];
   loadingUsers: boolean;
   fetchUsers: () => Promise<void>;
+  subscribeToUsers: () => () => void;
   updateUserRole: (uid: string, newRole: Role) => Promise<void>;
   addUser: (userData: { email: string; displayName: string; role: Role; photoURL?: string | null }) => Promise<UserProfile>;
 }
@@ -159,6 +160,49 @@ export const useUserStore = create<UserState>((set, get) => ({
         saveStoredUsers(existing);
       }
       set({ users: existing, loadingUsers: false });
+    }
+  },
+  subscribeToUsers: () => {
+    try {
+      const q = query(collection(db, 'users'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        if (!snapshot.empty) {
+          const firestoreUsers: UserProfile[] = [];
+          snapshot.forEach((doc) => {
+            firestoreUsers.push({ uid: doc.id, ...doc.data() } as UserProfile);
+          });
+
+          const currentProfile = useAuthStore.getState().profile;
+          const mergedMap = new Map<string, UserProfile>();
+          getStoredUsers().forEach(u => {
+            const key = u.email ? u.email.toLowerCase() : u.uid;
+            mergedMap.set(key, u);
+          });
+          
+          firestoreUsers.forEach(u => {
+            const key = u.email ? u.email.toLowerCase() : u.uid;
+            const existing = mergedMap.get(key);
+            mergedMap.set(key, { ...existing, ...u });
+          });
+
+          if (currentProfile) {
+            const key = currentProfile.email ? currentProfile.email.toLowerCase() : currentProfile.uid;
+            const existing = mergedMap.get(key);
+            mergedMap.set(key, { ...existing, ...currentProfile });
+          }
+
+          const combined = Array.from(mergedMap.values());
+          saveStoredUsers(combined);
+          set({ users: combined, loadingUsers: false });
+        }
+      }, (err) => {
+        console.warn("Users realtime snapshot notice:", err?.message);
+      });
+
+      return () => unsubscribe();
+    } catch (e) {
+      console.warn("Could not subscribe to users:", e);
+      return () => {};
     }
   },
   updateUserRole: async (uid: string, newRole: Role) => {

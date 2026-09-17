@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useProjectStore } from '../store/projectStore';
-import { ArrowLeft, List as ListIcon, LayoutDashboard, Calendar, Plus, Users, Edit3, Trash2, BarChart2, FolderKanban, FileText, Paperclip, ExternalLink } from 'lucide-react';
+import { ArrowLeft, List as ListIcon, LayoutDashboard, Calendar, Plus, Users, Edit3, Trash2, BarChart2, FolderKanban, FileText, Paperclip, ExternalLink, MessageSquare, CheckSquare } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { Task } from '../types';
 import BoardView from '../components/BoardView';
@@ -296,7 +296,25 @@ export default function ProjectDetail() {
                           className="hover:bg-gray-50 cursor-pointer"
                           onClick={() => handleOpenTaskModal(task)}
                         >
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{task.title}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <div className="flex flex-col">
+                              <span>{task.title}</span>
+                              <div className="flex items-center gap-2 mt-1">
+                                {task.comments && task.comments.length > 0 && (
+                                  <span className="inline-flex items-center text-[11px] text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded font-normal" title={`${task.comments.length} komentar`}>
+                                    <MessageSquare className="h-3 w-3 mr-1" />
+                                    {task.comments.length} komentar
+                                  </span>
+                                )}
+                                {task.subtasks && task.subtasks.length > 0 && (
+                                  <span className="inline-flex items-center text-[11px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-normal" title="Subtask selesai">
+                                    <CheckSquare className="h-3 w-3 mr-1" />
+                                    {task.subtasks.filter(st => st.isCompleted).length}/{task.subtasks.length} subtask
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {task.assignees.length > 0 ? task.assignees.length + ' members' : 'Unassigned'}
                           </td>
