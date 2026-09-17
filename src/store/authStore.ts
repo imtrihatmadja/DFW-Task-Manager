@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { auth, db, checkRedirectResult } from '../lib/firebase';
 import { UserProfile, Role } from '../types';
 
 interface AuthState {
@@ -79,6 +79,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: null, profile: null, loading: false, initialized: true });
   }
 }));
+
+// Check redirect result on load
+checkRedirectResult().catch((err) => {
+  console.warn("No pending redirect or redirect error:", err);
+});
 
 // Initialize auth listener
 onAuthStateChanged(auth, async (user) => {

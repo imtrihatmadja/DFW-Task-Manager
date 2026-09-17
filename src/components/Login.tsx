@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { signInWithGoogle } from '../lib/firebase';
+import { signInWithGoogle, signInWithGoogleRedirect } from '../lib/firebase';
 import { useAuthStore } from '../store/authStore';
-import { Anchor, AlertCircle, ShieldCheck, UserCheck, Users } from 'lucide-react';
+import { Anchor, AlertCircle, ShieldCheck, UserCheck, Users, ExternalLink } from 'lucide-react';
 import { Role } from '../types';
 
 export default function Login() {
@@ -16,12 +16,28 @@ export default function Login() {
       await signInWithGoogle();
     } catch (err: any) {
       console.error(err);
-      if (err.code === 'auth/popup-blocked' || err.message?.includes('popup')) {
-        setError('Jendela popup diblokir oleh peramban atau iframe. Anda dapat membuka di tab baru atau menggunakan opsi Akses Cepat di bawah.');
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('Jendela popup SSO ditutup sebelum login selesai. Jika popup tertutup otomatis oleh browser/iframe, silakan gunakan tombol "Buka Tab Baru" atau opsi "Masuk dengan Redirect (Halaman Penuh)".');
+      } else if (err.code === 'auth/popup-blocked' || err.message?.includes('popup')) {
+        setError('Jendela popup diblokir oleh peramban atau iframe. Silakan buka aplikasi di tab baru atau gunakan opsi "Masuk dengan Redirect".');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError(`Domain ini belum diizinkan di Firebase Console. Pastikan Authorized Domain telah ditambahkan.`);
       } else {
         setError(err.message || 'Gagal masuk dengan akun Google.');
       }
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleRedirectLogin = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await signInWithGoogleRedirect();
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Gagal memulai autentikasi redirect.');
       setLoading(false);
     }
   };
@@ -59,7 +75,7 @@ export default function Login() {
           </div>
         )}
 
-        <div>
+        <div className="space-y-2">
           <button
             onClick={handleGoogleLogin}
             disabled={loading}
@@ -74,8 +90,30 @@ export default function Login() {
                 <path d="M1 1h22v22H1z" fill="none" />
               </svg>
             </span>
-            {loading ? 'Menghubungkan Akun...' : 'Masuk dengan Google (SSO)'}
+            {loading ? 'Menghubungkan Akun...' : 'Masuk dengan Google (Popup)'}
           </button>
+
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button
+              type="button"
+              onClick={handleGoogleRedirectLogin}
+              disabled={loading}
+              className="flex items-center justify-center px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              title="Gunakan redirect halaman penuh jika popup browser terblokir"
+            >
+              Mode Redirect (Full)
+            </button>
+            <a
+              href={window.location.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center px-3 py-2 text-xs font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors"
+              title="Buka di tab peramban terpisah agar popup bebas dari batasan iframe"
+            >
+              <ExternalLink className="w-3.5 h-3.5 mr-1" />
+              Buka Tab Baru
+            </a>
+          </div>
         </div>
 
         <div className="relative my-4">

@@ -1,5 +1,12 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signInWithRedirect, 
+  getRedirectResult, 
+  signOut 
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
 
@@ -10,6 +17,9 @@ export const db = customDbId ? getFirestore(app, customDbId) : getFirestore(app)
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
 // Cache the access token in memory
 let cachedAccessToken: string | null = null;
@@ -22,8 +32,35 @@ export const signInWithGoogle = async () => {
       cachedAccessToken = credential.accessToken;
     }
     return result.user;
+  } catch (error: any) {
+    console.error("Error signing in with Google Popup:", error);
+    // If popup was closed by user or blocked, provide clear error code
+    throw error;
+  }
+};
+
+export const signInWithGoogleRedirect = async () => {
+  try {
+    await signInWithRedirect(auth, googleProvider);
   } catch (error) {
-    console.error("Error signing in with Google:", error);
+    console.error("Error signing in with Google Redirect:", error);
+    throw error;
+  }
+};
+
+export const checkRedirectResult = async () => {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result) {
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential && credential.accessToken) {
+        cachedAccessToken = credential.accessToken;
+      }
+      return result.user;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error processing redirect result:", error);
     throw error;
   }
 };
