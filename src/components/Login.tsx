@@ -22,7 +22,7 @@ export default function Login() {
         setError('Jendela popup diblokir oleh peramban atau iframe. Silakan buka aplikasi di tab baru atau gunakan opsi "Mode Redirect (Full)".');
       } else if (err.code === 'auth/unauthorized-domain') {
         const currentHost = window.location.hostname;
-        setError(`Domain "${currentHost}" belum didaftarkan di Firebase Console. Buka Firebase Console untuk proyek "gen-lang-client-0385654232" > Authentication > Settings > Authorized domains, lalu klik "Add domain" dan masukkan: ${currentHost}`);
+        setError(`Domain "${currentHost}" belum didaftarkan di Firebase Console. Buka Firebase Console (proyek: gen-lang-client-0385654232) -> Authentication -> Settings -> Authorized domains, lalu tambahkan domain ini.`);
       } else {
         setError(err.message || 'Gagal masuk dengan akun Google.');
       }
