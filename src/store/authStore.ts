@@ -11,20 +11,81 @@ interface AuthState {
   initialized: boolean;
   setUser: (user: User | null) => void;
   setProfile: (profile: UserProfile | null) => void;
+  loginAsDemo: (role?: Role, email?: string, name?: string) => void;
+  logout: () => Promise<void>;
 }
 
+const DEMO_USER_KEY = 'dfw_demo_session';
+
+const getStoredDemoSession = (): { user: User; profile: UserProfile } | null => {
+  try {
+    const raw = localStorage.getItem(DEMO_USER_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const initialSession = getStoredDemoSession();
+
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  profile: null,
-  loading: true,
-  initialized: false,
+  user: initialSession ? initialSession.user : null,
+  profile: initialSession ? initialSession.profile : null,
+  loading: !initialSession,
+  initialized: !!initialSession,
   setUser: (user) => set({ user }),
   setProfile: (profile) => set({ profile }),
+  loginAsDemo: (role: Role = 'admin', email?: string, name?: string) => {
+    const effectiveEmail = email || (role === 'field_officer' ? 'dewi.lestari@dfw.or.id' : (role === 'project_coordinator' ? 'budi.santoso@dfw.or.id' : 'admin@dfw.or.id'));
+    const effectiveName = name || (role === 'field_officer' ? 'Dewi Lestari (Field Officer)' : (role === 'project_coordinator' ? 'Budi Santoso (Project Coordinator)' : 'Admin DFW (Koordinator Nasional)'));
+    const effectiveUid = role === 'field_officer' ? 'officer-1' : (role === 'project_coordinator' ? 'coordinator-1' : 'admin');
+
+    const demoUser = {
+      uid: effectiveUid,
+      email: effectiveEmail,
+      displayName: effectiveName,
+      photoURL: null,
+    } as unknown as User;
+
+    const demoProfile: UserProfile = {
+      uid: effectiveUid,
+      email: effectiveEmail,
+      displayName: effectiveName,
+      photoURL: null,
+      role: role,
+      createdAt: Date.now() - 30 * 24 * 3600 * 1000,
+    };
+
+    try {
+      localStorage.setItem(DEMO_USER_KEY, JSON.stringify({ user: demoUser, profile: demoProfile }));
+    } catch (e) {
+      console.warn("Could not persist demo session to localStorage", e);
+    }
+
+    set({ user: demoUser, profile: demoProfile, loading: false, initialized: true });
+  },
+  logout: async () => {
+    try {
+      localStorage.removeItem(DEMO_USER_KEY);
+    } catch (e) {
+      console.warn("Could not remove demo session from localStorage", e);
+    }
+    try {
+      await auth.signOut();
+    } catch (e) {
+      console.warn("Firebase sign out warning:", e);
+    }
+    set({ user: null, profile: null, loading: false, initialized: true });
+  }
 }));
 
 // Initialize auth listener
 onAuthStateChanged(auth, async (user) => {
   if (user) {
+    try {
+      localStorage.removeItem(DEMO_USER_KEY);
+    } catch {}
     useAuthStore.getState().setUser(user);
     
     // Fetch or create user profile
@@ -78,8 +139,11 @@ onAuthStateChanged(auth, async (user) => {
       });
     }
   } else {
-    useAuthStore.getState().setUser(null);
-    useAuthStore.getState().setProfile(null);
+    const stored = getStoredDemoSession();
+    if (!stored) {
+      useAuthStore.getState().setUser(null);
+      useAuthStore.getState().setProfile(null);
+    }
   }
   
   useAuthStore.setState({ loading: false, initialized: true });
