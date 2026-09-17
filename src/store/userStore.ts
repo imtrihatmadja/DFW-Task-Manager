@@ -203,7 +203,7 @@ export const useUserStore = create<UserState>((set, get) => ({
 
     try {
       const userRef = doc(db, 'users', generatedUid);
-      await setDoc(userRef, newUser);
+      await withTimeout(setDoc(userRef, newUser), 1500);
     } catch (error) {
       console.warn("Could not save new user to Firestore (saved locally):", error);
     }

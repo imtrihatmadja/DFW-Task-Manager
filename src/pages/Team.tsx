@@ -112,18 +112,33 @@ export default function Team() {
     setIsSubmittingNewUser(true);
     setErrorMsg(null);
 
+    const emailTrimmed = newEmail.trim();
+    const displayNameTrimmed = newDisplayName.trim() || emailTrimmed.split('@')[0];
+    const roleChosen = newRole;
+
     try {
-      await addUser({
-        email: newEmail.trim(),
-        displayName: newDisplayName.trim() || newEmail.trim().split('@')[0],
-        role: newRole
+      const addedUser = await addUser({
+        email: emailTrimmed,
+        displayName: displayNameTrimmed,
+        role: roleChosen
       });
-      await refetch();
+
+      // Update cache React Query secara optimistik seketika (0 ms)
+      queryClient.setQueryData(['teamUsers'], (old: any[] | undefined) => {
+        if (!old) return [addedUser];
+        const exists = old.some(u => u.uid === addedUser.uid || u.email.toLowerCase() === addedUser.email.toLowerCase());
+        if (exists) {
+          return old.map(u => (u.uid === addedUser.uid || u.email.toLowerCase() === addedUser.email.toLowerCase()) ? addedUser : u);
+        }
+        return [addedUser, ...old];
+      });
+
+      // Tutup modal dan reset form seketika
       setIsAddModalOpen(false);
       setNewDisplayName('');
       setNewEmail('');
       setNewRole('field_officer');
-      setSuccessMsg(`Anggota tim ${newEmail.trim()} berhasil ditambahkan!`);
+      setSuccessMsg(`Anggota tim ${emailTrimmed} berhasil ditambahkan!`);
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err: any) {
       setErrorMsg(`Gagal menambahkan anggota: ${err?.message || 'Terjadi kesalahan'}`);
