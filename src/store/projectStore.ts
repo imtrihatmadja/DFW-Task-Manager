@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { collection, query, onSnapshot, doc, updateDoc, addDoc, deleteDoc, where, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Project, Task, Portfolio } from '../types';
+import { Project, Task, Portfolio, Comment, Subtask } from '../types';
 import { useAuthStore } from './authStore';
 import { queryClient } from '../lib/queryClient';
 
@@ -291,6 +291,8 @@ interface ProjectState {
   createTask: (task: Omit<Task, 'id'>) => Promise<string>;
   updateTask: (id: string, data: Partial<Task>) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
+  addCommentToTask: (taskId: string, comment: Comment) => Promise<void>;
+  addCommentToSubtask: (taskId: string, subtaskId: string, comment: Comment) => Promise<void>;
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -738,6 +740,75 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       await withTimeout(deleteDoc(doc(db, 'tasks', id)), 1500);
     } catch (err) {
       console.warn("Task deletion cached locally:", err);
+    }
+  },
+
+  addCommentToTask: async (taskId: string, comment: Comment) => {
+    const now = Date.now();
+    const task = get().allTasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const updatedComments = [...(task.comments || []), comment];
+    const updates: Partial<Task> = {
+      comments: updatedComments,
+      updatedAt: now
+    };
+
+    // Instant optimistic update (0ms delay)
+    const updatedTasks = get().tasks.map(t => (t.id === taskId ? { ...t, ...updates } : t));
+    const updatedAll = get().allTasks.map(t => (t.id === taskId ? { ...t, ...updates } : t));
+    set({ tasks: updatedTasks, allTasks: updatedAll });
+    saveStored(STORAGE_KEYS.TASKS, updatedAll);
+
+    queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+    queryClient.invalidateQueries({ queryKey: ['projects'] });
+
+    try {
+      await withTimeout(updateDoc(doc(db, 'tasks', taskId), {
+        comments: sanitizeForFirestore(updatedComments),
+        updatedAt: now
+      }), 1500);
+    } catch (err) {
+      console.warn("Task comment cached locally and will sync:", err);
+    }
+  },
+
+  addCommentToSubtask: async (taskId: string, subtaskId: string, comment: Comment) => {
+    const now = Date.now();
+    const task = get().allTasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const updatedSubtasks = (task.subtasks || []).map(st => {
+      if (st.id === subtaskId) {
+        return {
+          ...st,
+          comments: [...(st.comments || []), comment]
+        };
+      }
+      return st;
+    });
+
+    const updates: Partial<Task> = {
+      subtasks: updatedSubtasks,
+      updatedAt: now
+    };
+
+    // Instant optimistic update (0ms delay)
+    const updatedTasks = get().tasks.map(t => (t.id === taskId ? { ...t, ...updates } : t));
+    const updatedAll = get().allTasks.map(t => (t.id === taskId ? { ...t, ...updates } : t));
+    set({ tasks: updatedTasks, allTasks: updatedAll });
+    saveStored(STORAGE_KEYS.TASKS, updatedAll);
+
+    queryClient.invalidateQueries({ queryKey: ['allTasks'] });
+    queryClient.invalidateQueries({ queryKey: ['projects'] });
+
+    try {
+      await withTimeout(updateDoc(doc(db, 'tasks', taskId), {
+        subtasks: sanitizeForFirestore(updatedSubtasks),
+        updatedAt: now
+      }), 1500);
+    } catch (err) {
+      console.warn("Subtask comment cached locally and will sync:", err);
     }
   }
 }));

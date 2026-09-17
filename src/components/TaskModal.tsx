@@ -173,9 +173,11 @@ interface TaskModalProps {
 
 export default function TaskModal({ projectId, task, onClose }: TaskModalProps) {
   const profile = useAuthStore(state => state.profile);
-  const { createTask, updateTask, projects } = useProjectStore();
+  const { createTask, updateTask, addCommentToTask, addCommentToSubtask, projects, allTasks } = useProjectStore();
   const { users, fetchUsers, loadingUsers } = useUserStore();
   
+  // Real-time synchronization: read latest task state from store
+  const activeTask = task ? (allTasks.find(t => t.id === task.id) || task) : null;
   const project = projects.find(p => p.id === projectId);
   
   const [title, setTitle] = useState(task?.title || '');
@@ -215,6 +217,18 @@ export default function TaskModal({ projectId, task, onClose }: TaskModalProps) 
 
   const [comments, setComments] = useState<Comment[]>(task?.comments || []);
   const [newCommentText, setNewCommentText] = useState('');
+
+  // Keep comments and subtasks in sync in real-time when another user or background sync adds them
+  useEffect(() => {
+    if (activeTask) {
+      if (activeTask.comments && JSON.stringify(activeTask.comments) !== JSON.stringify(comments)) {
+        setComments(activeTask.comments);
+      }
+      if (activeTask.subtasks && JSON.stringify(activeTask.subtasks) !== JSON.stringify(subtasks)) {
+        setSubtasks(activeTask.subtasks);
+      }
+    }
+  }, [activeTask?.comments, activeTask?.subtasks]);
 
   // State for mentions & auto-assign notification
   const [mentionNotice, setMentionNotice] = useState<string | null>(null);
@@ -656,10 +670,17 @@ export default function TaskModal({ projectId, task, onClose }: TaskModalProps) 
       ...prev,
       [subtaskId]: true
     }));
+
+    // If task is already saved on server/store, persist immediately in background for instant sync
+    if (task?.id) {
+      addCommentToSubtask(task.id, subtaskId, newComment).catch(err => {
+        console.warn("Background subtask comment sync:", err);
+      });
+    }
   };
 
   const handleDeleteSubtaskComment = (subtaskId: string, commentId: string) => {
-    setSubtasks(prev => prev.map(st => {
+    const updatedSubtasks = subtasks.map(st => {
       if (st.id === subtaskId) {
         return {
           ...st,
@@ -667,7 +688,15 @@ export default function TaskModal({ projectId, task, onClose }: TaskModalProps) 
         };
       }
       return st;
-    }));
+    });
+
+    setSubtasks(updatedSubtasks);
+
+    if (task?.id) {
+      updateTask(task.id, { subtasks: updatedSubtasks }).catch(err => {
+        console.warn("Subtask comment deletion sync:", err);
+      });
+    }
   };
 
   const formatCommentDate = (timestamp: number) => {
@@ -690,12 +719,23 @@ export default function TaskModal({ projectId, task, onClose }: TaskModalProps) 
     // Auto-assign any mentioned users in this main comment
     extractAndAssignMentionedUsers(newCommentText);
 
-    setComments([
-      ...comments,
-      { id: generateId(), userId: profile.uid, text: newCommentText, createdAt: Date.now() }
-    ]);
+    const newComment: Comment = {
+      id: generateId(),
+      userId: profile.uid,
+      text: newCommentText.trim(),
+      createdAt: Date.now()
+    };
+
+    setComments(prev => [...prev, newComment]);
     setNewCommentText('');
     setIsMainMentionOpen(false);
+
+    // If task exists, persist immediately in background so all users see it in real-time
+    if (task?.id) {
+      addCommentToTask(task.id, newComment).catch(err => {
+        console.warn("Background task comment sync:", err);
+      });
+    }
   };
 
   const isAssigneeSelected = (member: UserProfile) => {
@@ -1183,35 +1223,86 @@ export default function TaskModal({ projectId, task, onClose }: TaskModalProps) 
 
               {/* Comments Section */}
               <div className="mt-8">
-                <div className="flex items-center text-gray-900 font-medium mb-4">
-                  <MessageSquare className="w-5 h-5 mr-2 text-teal-600" />
-                  Comments
+                <div className="flex items-center justify-between text-gray-900 font-medium mb-4">
+                  <div className="flex items-center">
+                    <MessageSquare className="w-5 h-5 mr-2 text-teal-600" />
+                    <span>Diskusi & Komentar Tugas</span>
+                    <span className="ml-2 px-2 py-0.5 text-xs bg-teal-50 text-teal-700 rounded-full font-semibold border border-teal-200">
+                      {comments.length}
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-400 font-normal">
+                    Realtime sync • Tersimpan otomatis
+                  </span>
                 </div>
-                <div className="space-y-4 mb-4">
-                  {comments.map(comment => {
-                    const commentUser = users.find(u => u.uid === comment.userId);
-                    return (
-                      <div key={comment.id} className="flex space-x-3">
-                        {commentUser?.photoURL ? (
-                          <img src={commentUser.photoURL} alt="" className="h-8 w-8 rounded-full" />
-                        ) : (
-                          <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold text-xs">
-                            {commentUser?.displayName?.charAt(0) || 'U'}
-                          </div>
-                        )}
-                        <div className="flex-1 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-sm font-medium text-gray-900">{commentUser?.displayName || 'User'}</span>
-                            <span className="text-xs text-gray-500">{new Date(comment.createdAt).toLocaleDateString()}</span>
-                          </div>
-                          <div className="text-sm text-gray-700 whitespace-pre-wrap">
-                            {renderCommentContent(comment.text)}
+                
+                {comments.length === 0 ? (
+                  <div className="text-center py-6 bg-gray-50/70 rounded-lg border border-dashed border-gray-200 text-gray-500 text-xs mb-4">
+                    Belum ada komentar pada tugas ini. Tulis komentar atau mention anggota tim di bawah.
+                  </div>
+                ) : (
+                  <div className="space-y-3 mb-4 max-h-96 overflow-y-auto pr-1">
+                    {comments.map(comment => {
+                      const commentUser = users.find(u => {
+                        if (u.uid === comment.userId) return true;
+                        if (u.email && comment.userId && u.email.toLowerCase() === comment.userId.toLowerCase()) return true;
+                        return false;
+                      });
+                      const isAuthor = profile?.uid === comment.userId || profile?.role === 'admin';
+                      return (
+                        <div key={comment.id} className="flex space-x-3 group">
+                          {commentUser?.photoURL ? (
+                            <img src={commentUser.photoURL} alt="" className="h-8 w-8 rounded-full flex-shrink-0 object-cover border border-gray-200" />
+                          ) : (
+                            <div className="h-8 w-8 rounded-full bg-teal-100 border border-teal-200 flex items-center justify-center text-teal-700 font-bold text-xs flex-shrink-0">
+                              {(commentUser?.displayName || commentUser?.email || 'U').charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="flex-1 bg-white p-3 rounded-lg border border-gray-200 shadow-2xs">
+                            <div className="flex justify-between items-center mb-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-semibold text-gray-900">
+                                  {commentUser?.displayName || commentUser?.email || 'Anggota Tim'}
+                                </span>
+                                {commentUser?.role === 'admin' && (
+                                  <span className="text-[10px] bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.2 rounded-xs font-medium">
+                                    Koordinator
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] text-gray-400">
+                                  {formatCommentDate(comment.createdAt)}
+                                </span>
+                                {isAuthor && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = comments.filter(c => c.id !== comment.id);
+                                      setComments(updated);
+                                      if (task?.id) {
+                                        updateTask(task.id, { comments: updated }).catch(err => {
+                                          console.warn("Delete comment sync:", err);
+                                        });
+                                      }
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity p-0.5"
+                                    title="Hapus komentar"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">
+                              {renderCommentContent(comment.text)}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {/* Main Comment Input Area with MentionDropdown */}
                 <div className="relative">
