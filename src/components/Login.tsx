@@ -17,11 +17,12 @@ export default function Login() {
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/popup-closed-by-user') {
-        setError('Jendela popup SSO ditutup sebelum login selesai. Jika popup tertutup otomatis oleh browser/iframe, silakan gunakan tombol "Buka Tab Baru" atau opsi "Masuk dengan Redirect (Halaman Penuh)".');
+        setError('Jendela popup SSO ditutup sebelum login selesai. Jika popup tertutup otomatis oleh browser/iframe, silakan gunakan tombol "Buka Tab Baru" atau opsi "Mode Redirect (Full)".');
       } else if (err.code === 'auth/popup-blocked' || err.message?.includes('popup')) {
-        setError('Jendela popup diblokir oleh peramban atau iframe. Silakan buka aplikasi di tab baru atau gunakan opsi "Masuk dengan Redirect".');
+        setError('Jendela popup diblokir oleh peramban atau iframe. Silakan buka aplikasi di tab baru atau gunakan opsi "Mode Redirect (Full)".');
       } else if (err.code === 'auth/unauthorized-domain') {
-        setError(`Domain ini belum diizinkan di Firebase Console. Pastikan Authorized Domain telah ditambahkan.`);
+        const currentHost = window.location.hostname;
+        setError(`Domain "${currentHost}" belum didaftarkan di Firebase Console. Buka Firebase Console untuk proyek "gen-lang-client-0385654232" > Authentication > Settings > Authorized domains, lalu klik "Add domain" dan masukkan: ${currentHost}`);
       } else {
         setError(err.message || 'Gagal masuk dengan akun Google.');
       }
